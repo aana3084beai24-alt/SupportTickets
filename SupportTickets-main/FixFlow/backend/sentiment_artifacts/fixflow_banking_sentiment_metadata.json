@@ -1,0 +1,45 @@
+{
+    "model_name": "FixFlow Banking Sentiment Classifier",
+    "algorithm": "TF-IDF + Logistic Regression",
+    "dataset": "Synthetic approved banking sentiment dataset v2",
+    "total_samples": 150,
+    "training_samples": 127,
+    "test_samples": 23,
+    "classes": [
+        "negative",
+        "neutral",
+        "positive"
+    ],
+    "best_parameters": {
+        "C": 2,
+        "min_df": 1,
+        "ngram_range": [
+            1,
+            2
+        ]
+    },
+    "test_metrics": {
+        "accuracy": 0.913,
+        "macro_f1": 0.9131,
+        "weighted_f1": 0.9127
+    },
+    "confusion_matrix": [
+        [
+            6,
+            0,
+            1
+        ],
+        [
+            0,
+            8,
+            0
+        ],
+        [
+            0,
+            1,
+            7
+        ]
+    ],
+    "scikit_learn_version": "1.6.1",
+    "note": "Evaluation uses a small synthetic dataset. Real-world performance requires further validation."
+}
