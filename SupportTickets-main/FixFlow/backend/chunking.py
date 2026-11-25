@@ -1,7 +1,5 @@
-
 import re
 import uuid
-
 
 MAX_CHARS = 1200
 

@@ -1,21 +1,22 @@
-
 import enum
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
+
 from sqlalchemy import (
     Boolean,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Integer,
     String,
     Text,
     func,
-    Integer,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -50,15 +51,29 @@ class Tenant(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+
+    name: Mapped[str] = mapped_column(
+        String(120),
+        unique=True,
+        index=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
 
-    users: Mapped[list["User"]] = relationship(back_populates="tenant")
-    tickets: Mapped[list["Ticket"]] = relationship(back_populates="tenant")
-    documents: Mapped[list["Document"]] = relationship(back_populates="tenant")
+    users: Mapped[list["User"]] = relationship(
+        back_populates="tenant"
+    )
+
+    tickets: Mapped[list["Ticket"]] = relationship(
+        back_populates="tenant"
+    )
+
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="tenant"
+    )
 
 
 class User(Base):
@@ -69,28 +84,70 @@ class User(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
     tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    full_name: Mapped[str] = mapped_column(String(120))
+
+    full_name: Mapped[str] = mapped_column(
+        String(120)
+    )
+
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         index=True,
     )
-    password_hash: Mapped[str] = mapped_column(String(255))
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255)
+    )
+
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="user_role"),
         nullable=False,
     )
+
+    category_links: Mapped[list["EmployeeCategory"]] = relationship(
+        back_populates="employee",
+        cascade="all, delete-orphan",
+    )
+
+    supported_categories = association_proxy(
+        "category_links",
+        "category",
+        creator=lambda category: EmployeeCategory(category=category),
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
 
-    tenant: Mapped[Optional["Tenant"]] = relationship(back_populates="users")
+    tenant: Mapped[Optional["Tenant"]] = relationship(
+        back_populates="users"
+    )
+
+
+class EmployeeCategory(Base):
+    __tablename__ = "employee_categories"
+
+    employee_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    category: Mapped[str] = mapped_column(
+        String(100),
+        primary_key=True,
+    )
+
+    employee: Mapped["User"] = relationship(
+        back_populates="category_links"
+    )
 
 
 class Ticket(Base):
@@ -101,35 +158,66 @@ class Ticket(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         index=True,
     )
-    subject: Mapped[str] = mapped_column(String(200))
-    body: Mapped[str] = mapped_column(Text)
+
+    subject: Mapped[str] = mapped_column(
+        String(200)
+    )
+
+    body: Mapped[str] = mapped_column(
+        Text
+    )
+
     status: Mapped[TicketStatus] = mapped_column(
         SAEnum(TicketStatus, name="ticket_status"),
         default=TicketStatus.open,
         server_default="open",
     )
-    reply: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    category: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
-    priority: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    reply: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    category: Mapped[Optional[str]] = mapped_column(
+        String(80),
+        nullable=True,
+    )
+
+    priority: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    sentiment: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
     assigned_to_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
     )
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="tickets")
+    tenant: Mapped["Tenant"] = relationship(
+        back_populates="tickets"
+    )
+
     drafts: Mapped[list["Draft"]] = relationship(
         back_populates="ticket",
         cascade="all, delete-orphan",
@@ -141,6 +229,7 @@ class Document(Base):
     Stores company document metadata.
     The actual file is stored in private Supabase Storage.
     """
+
     __tablename__ = "documents"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -154,9 +243,19 @@ class Document(Base):
         index=True,
     )
 
-    title: Mapped[str] = mapped_column(String(200))
-    filename: Mapped[str] = mapped_column(String(255))
-    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(
+        String(200)
+    )
+
+    filename: Mapped[str] = mapped_column(
+        String(255)
+    )
+
+    file_size: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
     storage_path: Mapped[str] = mapped_column(
         String(500),
         unique=True,
@@ -174,10 +273,10 @@ class Document(Base):
     )
 
     tenant: Mapped["Tenant"] = relationship(
-        back_populates="documents",
+        back_populates="documents"
     )
 
-    
+
 class Draft(Base):
     __tablename__ = "drafts"
 
@@ -186,32 +285,46 @@ class Draft(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         index=True,
     )
+
     ticket_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tickets.id", ondelete="CASCADE"),
         index=True,
     )
-    content: Mapped[str] = mapped_column(Text)
-    citations: Mapped[list] = mapped_column(JSONB, default=list)
+
+    content: Mapped[str] = mapped_column(
+        Text
+    )
+
+    citations: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+    )
+
     insufficient_evidence: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         server_default="false",
     )
+
     status: Mapped[DraftStatus] = mapped_column(
         SAEnum(DraftStatus, name="draft_status"),
         default=DraftStatus.pending,
         server_default="pending",
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
 
-    ticket: Mapped["Ticket"] = relationship(back_populates="drafts")
+    ticket: Mapped["Ticket"] = relationship(
+        back_populates="drafts"
+    )
 
 
 class Invitation(Base):
@@ -222,30 +335,46 @@ class Invitation(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         index=True,
     )
+
     invited_by_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("users.id", ondelete="CASCADE"),
-    nullable=False,
-)
-    email: Mapped[str] = mapped_column(String(255), index=True)
-    # email: Mapped[str] = mapped_column(String(255), index=True)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        index=True,
+    )
+
+    full_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="user_role", create_type=False),
         nullable=False,
     )
+
     token_hash: Mapped[str] = mapped_column(
         String(255),
         unique=True,
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True)
+    )
+
     accepted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -253,10 +382,22 @@ class Invitation(Base):
 
 
 class OrganizationRegister(BaseModel):
-    company_name: str = Field(min_length=2, max_length=120)
-    admin_name: str = Field(min_length=2, max_length=120)
+    company_name: str = Field(
+        min_length=2,
+        max_length=120,
+    )
+
+    admin_name: str = Field(
+        min_length=2,
+        max_length=120,
+    )
+
     email: EmailStr
-    password: str = Field(min_length=12, max_length=128)
+
+    password: str = Field(
+        min_length=12,
+        max_length=128,
+    )
 
 
 class OrganizationAccessRequest(Base):
@@ -268,14 +409,23 @@ class OrganizationAccessRequest(Base):
         default=uuid.uuid4,
     )
 
-    company_name: Mapped[str] = mapped_column(String(120))
-    admin_name: Mapped[str] = mapped_column(String(120))
-    email: Mapped[str] = mapped_column(
-    String(255),
-    nullable=False,
-    index=True,
+    company_name: Mapped[str] = mapped_column(
+        String(120)
     )
-    password_hash: Mapped[str] = mapped_column(String(255))
+
+    admin_name: Mapped[str] = mapped_column(
+        String(120)
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255)
+    )
 
     status: Mapped[str] = mapped_column(
         String(20),
